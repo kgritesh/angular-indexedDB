@@ -12,11 +12,11 @@ var IDBKeyRange=window.IDBKeyRange||window.mozIDBKeyRange||window.webkitIDBKeyRa
 angular.module('xc.indexedDB', []).provider('$indexedDB', function() {
     var module          = this,
         /** IDBTransaction mode constants */
-        READONLY        = "readonly",
+            READONLY        = "readonly",
         READWRITE       = "readwrite",
         VERSIONCHANGE   = "versionchange",
         /** IDBCursor direction and skip behaviour constants */
-        NEXT            = "next",
+            NEXT            = "next",
         NEXTUNIQUE      = "nextunique",
         PREV            = "prev",
         PREVUNIQUE      = "prevunique";
@@ -201,9 +201,9 @@ angular.module('xc.indexedDB', []).provider('$indexedDB', function() {
                         data.forEach(function(item, i){
                             req = store.add(item);
                             req.onnotify = function(e) {
-                               $rootScope.$apply(function(){
+                                $rootScope.$apply(function(){
                                     d.notify(e.target.result);
-                                }); 
+                                });
                             }
                             req.onerror = function(e) {
                                 $rootScope.$apply(function(){
@@ -250,9 +250,9 @@ angular.module('xc.indexedDB', []).provider('$indexedDB', function() {
                         data.forEach(function(item, i){
                             req = store.put(item);
                             req.onnotify = function(e) {
-                               $rootScope.$apply(function(){
+                                $rootScope.$apply(function(){
                                     d.notify(e.target.result);
-                                }); 
+                                });
                             }
                             req.onerror = function(e) {
                                 $rootScope.$apply(function(){
@@ -428,17 +428,23 @@ angular.module('xc.indexedDB', []).provider('$indexedDB', function() {
             "each": function(options){
                 var d = $q.defer();
                 return this.internalObjectStore(this.storeName, READWRITE).then(function(store){
-                   var req;
-                   options = options || defaultQueryOptions;
-                   if(options.useIndex) {
+                    var req;
+                    options = options || defaultQueryOptions;
+                    if(options.useIndex) {
                         req = store.index(options.useIndex).openCursor(options.keyRange, options.direction);
                     } else {
                         req = store.openCursor(options.keyRange, options.direction);
                     }
                     req.onsuccess = req.onerror = function(e) {
-                        $rootScope.$apply(function(){
-                            d.resolve(e.target.result);
-                        });
+                        var cursor = e.target.result;
+                            $rootScope.$apply(function(){
+                                if(cursor){
+                                    d.notify(cursor);
+                                    cursor.continue();
+                                }
+                                else
+                                    d.resolve(cursor);
+                            });
                     };
                     return d.promise;
                 });
@@ -642,11 +648,11 @@ angular.module('xc.indexedDB', []).provider('$indexedDB', function() {
                     storeNames.forEach(function(storeName){
                         store = tx.objectStore(storeName);
                         stores.push({
-                           name: storeName,
-                           keyPath: store.keyPath,
-                           autoIncrement: store.autoIncrement,
-                           count: store.count(),
-                           indices: Array.prototype.slice.apply(store.indexNames)
+                            name: storeName,
+                            keyPath: store.keyPath,
+                            autoIncrement: store.autoIncrement,
+                            count: store.count(),
+                            indices: Array.prototype.slice.apply(store.indexNames)
                         });
                     });
                     return {
