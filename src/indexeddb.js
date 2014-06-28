@@ -183,6 +183,26 @@ angular.module('xc.indexedDB', []).provider('$indexedDB', function() {
             },
             /**
              * @ngdoc method
+             * @name $indexedDB.getAllIndices
+             * @function
+             *
+             * @description Get list of indices for this objectstore
+             *
+             * @returns {array} List of IDBIndex objects
+             */
+            "getAllIndices": function(){
+                var d = $q.defer();
+                var indices = [];
+                this.internalObjectStore(this.storeName, READWRITE).then(function(store){
+                    store.indexNames.forEach(function(index){
+                        indices.push(store.index(index));
+                    });
+                    return d.resolve(indices);
+                });
+            },
+
+            /**
+             * @ngdoc method
              * @name ObjectStore.insert
              * @function
              *
@@ -437,14 +457,14 @@ angular.module('xc.indexedDB', []).provider('$indexedDB', function() {
                     }
                     req.onsuccess = req.onerror = function(e) {
                         var cursor = e.target.result;
-                            $rootScope.$apply(function(){
-                                if(cursor){
-                                    d.notify(cursor);
-                                    cursor.continue();
-                                }
-                                else
-                                    d.resolve(cursor);
-                            });
+                        $rootScope.$apply(function(){
+                            if(cursor){
+                                d.notify(cursor);
+                                cursor.continue();
+                            }
+                            else
+                                d.resolve(cursor);
+                        });
                     };
                     return d.promise;
                 });
@@ -710,6 +730,91 @@ angular.module('xc.indexedDB', []).provider('$indexedDB', function() {
              */
             "queryBuilder": function() {
                 return new QueryBuilder();
+            },
+            /**
+             * @ngdoc method
+             * @name $indexedDB.export
+             * @function
+             *
+             * @description dumps the indexedDb database to json
+             *
+             * @returns {object} An object containing entire database dump.
+             * {
+             *      "name": Name of database,
+             *      "version": DB version,
+             *      "objectStores": Array of object Store objects
+             *
+             * }
+             *
+             */
+            "export": function(){
+                var d = $q.defer();
+                var that = this;
+                var storeNames, tx, store, dbSchema = {};
+                dbSchema.name = module.dbName;
+                dbSchema.version = module.dbVersion;
+                dbSchema.objectStores = [];
+                return dbPromise().then(function(db){
+                    storeNames = Array.prototype.slice.apply(db.objectStoreNames);
+                    tx = db.transaction(storeNames, READONLY);
+                    var incomplete  = storeNames.length;
+
+                    if(incomplete === 0)
+                        d.resolve(dbSchema);
+
+                    storeNames.forEach(function(storeName){
+                        var store = tx.objectStore(storeName);
+                        that.exportObjectStore(store).then(function(objStore){
+                            dbSchema.objectStores.push(objStore);
+                            --incomplete;
+                            if(incomplete === 0){
+                                d.resolve(dbSchema);
+                            }
+
+                        });
+                    }.bind(this));
+                    return d.promise;
+                });
+            },
+
+            /**
+             * @ngdoc method
+             * @name $indexedDB.exportObjectStore
+             * @function
+             *
+             * @description exports the indexedDb objectstore as javascript object
+             *
+             * @returns {object} An object containing entire objectStore
+             *
+             */
+            "exportObjectStore": function(store){
+                var objectStore = this.objectStore(store.name);
+                var storeObj = {};
+                var indices = this.exportIndices(store);
+                storeObj["meta"] = {
+                    name: store.name,
+                    keyPath: store.keyPath,
+                    autoIncrement: store.autoIncrement,
+                    indices: indices
+                };
+                return objectStore.getAll().then(function(results){
+                    storeObj["data"] = results;
+                    return storeObj;
+                });
+            },
+
+            "exportIndices": function(store){
+                var indices = [];
+                var indexNames = Array.prototype.slice.apply(store.indexNames);
+                indexNames.forEach(function(indexName){
+                    var idbIndex = store.index(indexName);
+                    indices.push({
+                        name: idbIndex.name,
+                        keyPath: idbIndex.keyPath,
+                        multiEntry: idbIndex.multiEntry,
+                        unique: idbIndex.unique
+                    });
+                });
             }
         };
     }];
